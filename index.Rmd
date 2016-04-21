@@ -1,0 +1,130 @@
+---
+title: "MachineLearning"
+author: "Petras Vaiciunas"
+date: "April 16, 2016"
+output: html_document
+---
+# Practical Machine Learning Course Project
+##### April 2016
+
+
+## Introduction
+
+The goal of this project is to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. Here with prediction modeling tried to find patterns in their behavior and quantify how well they do the practices. 
+
+
+The analysis will be using a random forest algorithm to predict the **classe** variable using the training data. This is essentially trying to predict what exercise is being done given the outputs of the wearable device. The obvious application of this in the real world is that given a correct algorithm to predict movement, these wearables will accurately be able to tell what their person is doing.
+
+
+The analysis below will retain all the R code so that you can follow along :) (i.e. echo = TRUE)
+
+
+
+### Training and Test data
+
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har.
+It is composed of data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. This is a great intro for analyzing the new wave of wearable devices and the data that they produce.
+
+```{r}
+    setwd("C:/Users/pvaiciunas/Documents/R")
+    training <- read.csv('./Data/pml-training.csv', na.strings=c("NA","#DIV/0!",""))
+    testing  <- read.csv('./Data/pml-testing.csv',  na.strings=c("NA","#DIV/0!",""))
+```
+
+
+As mentioned earlier, the **classe** variable is what we're interested in. The **classe** variable is the outcome and composed of five levels (A,B,C,D,E). These can be interpreted as the activity the person is performing. We can take a look at the distribution of these with the following:
+
+
+```{r}
+    summary(training$classe)
+    
+
+```
+
+### Feature Selection
+
+The dataset inclues variables that has less impact on prediction, thus we will exclude those variables with Near Zero Variance algorithm (NZV). We want to remove anything with mostly NAs (there are a lot occassionaly. The threshold for this will be >75%. We can also take out the columns that are clearly not predictors. Then the NZV algorithm will take care of the rest :)
+
+
+```{r}
+    library(caret)
+
+# first we will remove variables with mostly NAs (threshold>75%)
+    subTraining <- training
+    for (i in 1:length(training)) {
+      if (sum(is.na(training[ , i])) / nrow(training) >= 0.75) {
+        for (j in 1:length(subTraining)) {
+          if (length(grep(names(training[i]), names(subTraining)[j]))==1) {
+            subTraining <- subTraining[ , -j]
+          }
+        }
+      }
+    }
+
+# then we remove columns that are obviously not predictors
+    subTraining2 <- subTraining[,8:length(subTraining)]
+
+#remove variables with near zero variance
+    NZV <- nearZeroVar(subTraining2, saveMetrics = TRUE)
+    keep <- names(subTraining2)
+    
+```
+
+
+### Random Forest Model
+
+The Random Forest algorithm is fantastic for classification problems. It's much more robust than a simple tree and it more often than not outperforms more complicated algorithms that are computationally much more complex. Here we use the training data to fit a model and then cross validate by the test dataest for robustness.
+
+The outputs of this are shown below in the code. The confusion matrix is of special interest here. After running only the random forest model, we're looking at an error rate of about 1/3rd. However, post cross validation, we are able to boost up the prediciton accuracy to near 100%!!!!
+
+The code below shows the steps taken:
+
+
+```{r}
+    library(randomForest)
+
+# Random Forest Model
+    set.seed(1234)
+    modFit <- randomForest(classe~., data = subTraining2)
+    print(modFit)
+
+
+
+#cross validation with testing and training dataset
+    predict_test  <- predict(modFit, testing,  type = "class")
+    predict_train <- predict(modFit, training, type = "class")
+    confusionMatrix(training$classe, predict_train)
+
+
+```
+    
+    
+    
+You can see in this summary above what I was talking about with the 100% accuracy!!
+We can use this model now on the test dataset to predict what the **classe** outcome is.
+The results here are printed to a text file so that we can use the results for the quiz 
+associated with this assignment. 
+
+```{r}
+    predict_Final <- predict(modFit, testing, type = "class")
+    print(predict_Final)
+
+    
+    
+    pml_write_files = function(x) {
+        n = length(x)
+        for (i in 1:n) {
+            filename = paste0("problem_id_", i, ".txt")
+            write.table(x[i], file=filename, quote=FALSE,
+                        row.names=FALSE, col.names=FALSE)
+        }
+    }
+
+    pml_write_files(predict_Final)
+```
+
+### Conclusion
+
+Overall, by using a random forest model, and cross validation, we are able to predict the **classe** variables with almost perfect accuracy. Going into this assignment I was skeptical how an algorithm would perform with what was seemingly messy data. The fact that a person was able to perform the exercies incorrectly (on purpose) definitely adds noice to the data. But overall, the robustness that cross validation brings to random forest was enough to overcome this drawback, and an overall fantastic result arose. Prediction accuracy went up to 100%, and the **classe** outcome was able to be predicted in all of the test data. 
+
+Hope you enjoyed!!!
